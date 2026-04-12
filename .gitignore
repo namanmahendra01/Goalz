@@ -1,0 +1,13 @@
+.DS_Store
+.build/
+.venv/
+DerivedData/
+
+*.xcuserstate
+*.moved-aside
+
+Goalz.xcodeproj/xcuserdata/
+
+app_store_assets/
+make_app_store_screenshots.py
+stitch_exports/
