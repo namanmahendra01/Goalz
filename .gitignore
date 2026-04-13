@@ -2,6 +2,8 @@
 .build/
 .venv/
 DerivedData/
+__pycache__/
+*.pyc
 
 *.xcuserstate
 *.moved-aside
