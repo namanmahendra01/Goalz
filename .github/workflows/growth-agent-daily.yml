@@ -1,0 +1,52 @@
+name: Goalz Growth Agent Daily
+
+on:
+  schedule:
+    - cron: "30 13 * * *"
+  workflow_dispatch:
+
+jobs:
+  daily-growth:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GOOGLE_ADS_CLIENT_ID: ${{ secrets.GOOGLE_ADS_CLIENT_ID }}
+      GOOGLE_ADS_CLIENT_SECRET: ${{ secrets.GOOGLE_ADS_CLIENT_SECRET }}
+      GOOGLE_ADS_CUSTOMER_ID: ${{ secrets.GOOGLE_ADS_CUSTOMER_ID }}
+      GOOGLE_ADS_DEVELOPER_TOKEN: ${{ secrets.GOOGLE_ADS_DEVELOPER_TOKEN }}
+      GOOGLE_ADS_REFRESH_TOKEN: ${{ secrets.GOOGLE_ADS_REFRESH_TOKEN }}
+      APPLE_SEARCH_ADS_ORG_ID: ${{ secrets.APPLE_SEARCH_ADS_ORG_ID }}
+      APPLE_SEARCH_ADS_CERTIFICATE_PEM: ${{ secrets.APPLE_SEARCH_ADS_CERTIFICATE_PEM }}
+      APPLE_SEARCH_ADS_KEY_ID: ${{ secrets.APPLE_SEARCH_ADS_KEY_ID }}
+      APPLE_SEARCH_ADS_PRIVATE_KEY_PEM: ${{ secrets.APPLE_SEARCH_ADS_PRIVATE_KEY_PEM }}
+      META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+      META_AD_ACCOUNT_ID: ${{ secrets.META_AD_ACCOUNT_ID }}
+      META_APP_ID: ${{ secrets.META_APP_ID }}
+      META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Run daily planner
+        run: |
+          python3 -m growth_agent.cli daily-run \
+            --config growth_agent/config/default.json \
+            --metrics growth_agent/config/sample_metrics.json \
+            --report-out docs/growth-agent/daily-report.md \
+            --json-out docs/growth-agent/daily-report.json \
+            --summary-out "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload growth report
+        uses: actions/upload-artifact@v4
+        with:
+          name: goalz-growth-daily-report
+          path: |
+            docs/growth-agent/daily-report.md
+            docs/growth-agent/daily-report.json

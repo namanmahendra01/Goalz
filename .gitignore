@@ -11,3 +11,5 @@ Goalz.xcodeproj/xcuserdata/
 app_store_assets/
 make_app_store_screenshots.py
 stitch_exports/
+docs/growth-agent/daily-report.md
+docs/growth-agent/daily-report.json
