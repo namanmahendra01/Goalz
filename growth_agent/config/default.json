@@ -1,0 +1,40 @@
+{
+  "budget": {
+    "daily_max_usd": 25,
+    "channel_caps_usd": {
+      "google_ads": 7,
+      "apple_search_ads": 10,
+      "meta_ads": 8
+    }
+  },
+  "guardrails": {
+    "min_blended_roas": 5.0,
+    "min_spend_before_pause_usd": 15
+  },
+  "channels": {
+    "google_ads": {
+      "enabled": true,
+      "mode": "live"
+    },
+    "apple_search_ads": {
+      "enabled": true,
+      "mode": "live"
+    },
+    "meta_ads": {
+      "enabled": true,
+      "mode": "live"
+    },
+    "x_posts": {
+      "enabled": false,
+      "mode": "off"
+    },
+    "reddit_posts": {
+      "enabled": false,
+      "mode": "off"
+    },
+    "product_hunt": {
+      "enabled": false,
+      "mode": "off"
+    }
+  }
+}

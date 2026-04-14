@@ -1,0 +1,58 @@
+{\rtf1\ansi\deff0
+{\fonttbl{\f0 Arial;}}
+\fs24
+\b Goalz Google Ads API Basic Access Design Document\b0\par
+\par
+\b Product\b0\par
+Goalz is a premium iPhone app focused on helping a user stay committed to one goal at a time using a countdown and widget-driven visibility.\par
+\par
+\b Company\b0\par
+Goalz\par
+Website: https://namanmahendra01.github.io/Goalz/\par
+\par
+\b Manager account\b0\par
+Goalz Growth Manager (MCC 512-942-2372)\par
+\par
+\b Purpose of the API integration\b0\par
+The Google Ads API will be used only for internal marketing automation for Goalz. The system reads campaign performance, evaluates return on ad spend, adjusts campaign budgets within fixed guardrails, pauses underperforming campaigns, and generates daily internal reports. The integration is not offered as a public SaaS product or agency platform.\par
+\par
+\b Intended users\b0\par
+Internal users only. The system is operated by the Goalz owner and internal automation workflows. No public or client-facing users will access the tool.\par
+\par
+\b Supported Google Ads API capabilities\b0\par
+1. Campaign Management\par
+2. Reporting\par
+3. Limited Campaign Creation for Goalz-owned campaigns only\par
+\par
+\b Non-goals\b0\par
+1. No multi-client management for external advertisers.\par
+2. No resale or white-label API tooling.\par
+3. No user-generated ad creation from external customers.\par
+4. No Customer Match or sensitive audience upload workflows.\par
+\par
+\b System architecture\b0\par
+1. Cursor is used to build and improve the automation codebase.\par
+2. GitHub Actions runs scheduled daily jobs.\par
+3. The system stores credentials in GitHub Secrets.\par
+4. A repo-contained Python control plane reads config, validates secrets, calculates blended ROAS, and determines safe actions.\par
+5. Future live Google Ads executor modules will call the Google Ads API using OAuth credentials and the developer token.\par
+\par
+\b Safety controls\b0\par
+1. Daily spend is capped at 25 USD total for the first rollout.\par
+2. Channel split starts at Google 7 USD, Apple Search Ads 10 USD, and Meta 8 USD.\par
+3. The tool applies defensive behavior when blended ROAS is below the target threshold.\par
+4. Underperforming channels are paused automatically after configured spend thresholds.\par
+5. All actions are logged and reported.\par
+6. Secrets are never stored in source control.\par
+\par
+\b Data access and privacy\b0\par
+The tool only accesses advertising and performance data needed to manage Goalz campaigns. It does not expose that data to the public. It is used only by the Goalz operator for internal campaign management and reporting.\par
+\par
+\b Website and policy references\b0\par
+Marketing URL: https://namanmahendra01.github.io/Goalz/\par
+Privacy policy: https://namanmahendra01.github.io/Goalz/privacy/\par
+Support: https://namanmahendra01.github.io/Goalz/support/\par
+\par
+\b Summary\b0\par
+Goalz is requesting Basic Access for a narrowly scoped internal advertising automation workflow. The tool is designed to manage only Goalz-owned Google Ads campaigns, with budget guardrails, internal-only usage, and strong operational controls.\par
+}

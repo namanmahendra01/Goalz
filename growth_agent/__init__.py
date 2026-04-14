@@ -1,0 +1,1 @@
+"""Goalz growth automation package."""

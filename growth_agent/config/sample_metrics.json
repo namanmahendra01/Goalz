@@ -1,0 +1,25 @@
+{
+  "blended_roas": 4.7,
+  "attributed_revenue_usd": 47,
+  "total_marketing_spend_usd": 10,
+  "channels": {
+    "google_ads": {
+      "spend_usd": 5,
+      "revenue_usd": 12,
+      "roas": 2.4,
+      "conversions": 1
+    },
+    "apple_search_ads": {
+      "spend_usd": 8,
+      "revenue_usd": 28,
+      "roas": 3.5,
+      "conversions": 2
+    },
+    "meta_ads": {
+      "spend_usd": 6,
+      "revenue_usd": 7,
+      "roas": 1.17,
+      "conversions": 0
+    }
+  }
+}
