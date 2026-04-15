@@ -82,6 +82,33 @@ def parse_args() -> argparse.Namespace:
         default=Path("growth_agent/marketing/ad_copy.json"),
     )
 
+    google_launch = subparsers.add_parser(
+        "google-ads-launch",
+        help="Create or enable the Goalz iOS App campaign via Google Ads API (no UI)",
+    )
+    google_launch.add_argument(
+        "--manifest",
+        type=Path,
+        default=Path("growth_agent/marketing/app_manifest.json"),
+    )
+    google_launch.add_argument(
+        "--ad-copy",
+        type=Path,
+        default=Path("growth_agent/marketing/ad_copy.json"),
+    )
+    google_launch.add_argument(
+        "--campaign-name",
+        default=None,
+        help="Override GOOGLE_ADS_GOALZ_CAMPAIGN_NAME (default: Goalz Autonomous Launch)",
+    )
+    google_launch.add_argument("--daily-budget-usd", type=float, default=None)
+    google_launch.add_argument("--target-cpa-usd", type=float, default=None)
+    google_launch.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print planned settings without calling the API",
+    )
+
     return parser.parse_args()
 
 
@@ -188,6 +215,34 @@ def print_meta_debug_url(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_google_ads_launch(args: argparse.Namespace) -> int:
+    from growth_agent.google_ads_launch import (
+        GoogleAdsLaunchError,
+        LaunchParams,
+        default_launch_params,
+        launch_goalz_app_campaign,
+    )
+
+    defaults = default_launch_params()
+    params = LaunchParams(
+        campaign_name=(args.campaign_name or defaults.campaign_name),
+        daily_budget_usd=args.daily_budget_usd if args.daily_budget_usd is not None else defaults.daily_budget_usd,
+        target_cpa_usd=args.target_cpa_usd if args.target_cpa_usd is not None else defaults.target_cpa_usd,
+        dry_run=args.dry_run or defaults.dry_run,
+    )
+    try:
+        result = launch_goalz_app_campaign(
+            manifest_path=args.manifest,
+            ad_copy_path=args.ad_copy,
+            params=params,
+        )
+    except GoogleAdsLaunchError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    print(json.dumps(result, indent=2))
+    return 0
+
+
 def print_campaign_assets(args: argparse.Namespace) -> int:
     bundle = campaign_asset_bundle(
         args.manifest,
@@ -231,6 +286,8 @@ def main() -> int:
         return print_secret_guide(args)
     if args.command == "campaign-assets":
         return print_campaign_assets(args)
+    if args.command == "google-ads-launch":
+        return run_google_ads_launch(args)
     raise ValueError(f"Unsupported command: {args.command}")
 
 

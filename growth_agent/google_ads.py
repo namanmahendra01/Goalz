@@ -91,10 +91,8 @@ def load_google_ads_env() -> GoogleAdsEnv:
     )
 
 
-def fetch_google_ads_channel_metrics(*, env: GoogleAdsEnv | None = None, days: int = 7) -> ChannelMetrics:
-    if days < 1 or days > 365:
-        raise GoogleAdsMetricsError("days must be between 1 and 365.")
-
+def build_google_ads_client(env: GoogleAdsEnv | None = None):
+    """Return a configured GoogleAdsClient (loads google-ads lazily)."""
     try:
         from google.ads.googleads.client import GoogleAdsClient
     except ImportError as exc:
@@ -104,9 +102,6 @@ def fetch_google_ads_channel_metrics(*, env: GoogleAdsEnv | None = None, days: i
         ) from exc
 
     env = env or load_google_ads_env()
-
-    end = date.today() - timedelta(days=1)
-    start = end - timedelta(days=days - 1)
 
     config: dict[str, object] = {
         "developer_token": env.developer_token,
@@ -119,9 +114,20 @@ def fetch_google_ads_channel_metrics(*, env: GoogleAdsEnv | None = None, days: i
         config["login_customer_id"] = env.login_customer_id
 
     try:
-        client = GoogleAdsClient.load_from_dict(config)
+        return GoogleAdsClient.load_from_dict(config)
     except Exception as exc:
         raise GoogleAdsMetricsError(f"Failed to initialize Google Ads client: {exc}") from exc
+
+
+def fetch_google_ads_channel_metrics(*, env: GoogleAdsEnv | None = None, days: int = 7) -> ChannelMetrics:
+    if days < 1 or days > 365:
+        raise GoogleAdsMetricsError("days must be between 1 and 365.")
+
+    env = env or load_google_ads_env()
+    client = build_google_ads_client(env)
+
+    end = date.today() - timedelta(days=1)
+    start = end - timedelta(days=days - 1)
 
     query = f"""
         SELECT

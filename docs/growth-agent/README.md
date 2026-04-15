@@ -52,6 +52,20 @@ This gets the autonomous control loop and reporting in place first, which is the
 
 Campaign launch steps, budgets, and platform links: [campaign-playbook.md](./campaign-playbook.md) (and [campaign.html](./campaign.html) for a short HTML summary).
 
+### Google Ads — fully automated App campaign (no UI)
+
+After GitHub Actions secrets are set, the workflow **Google Ads — Goalz App campaign** (`.github/workflows/google-ads-launch.yml`) runs on a **weekly** schedule and can be triggered manually. It calls:
+
+```bash
+python3 -m growth_agent.cli google-ads-launch \
+  --manifest growth_agent/marketing/app_manifest.json \
+  --ad-copy growth_agent/marketing/ad_copy.json
+```
+
+This creates an **iOS App campaign** (bundle id from `app_manifest.json`), **US + English** targeting, **~$7/day** budget and **~$5 target CPA** by default (override via env: `GOOGLE_ADS_GOALZ_DAILY_BUDGET_USD`, `GOOGLE_ADS_GOALZ_TARGET_CPA_USD`, `GOOGLE_ADS_GOALZ_CAMPAIGN_NAME`). The run is **idempotent**: an existing **ENABLED** campaign named `Goalz Autonomous Launch` is left unchanged; a **PAUSED** one is re-enabled.
+
+Dry run locally: add `--dry-run` or set `GOOGLE_ADS_LAUNCH_DRY_RUN=true`.
+
 ## Daily usage
 
 Install Python deps once (includes the official Google Ads API client):

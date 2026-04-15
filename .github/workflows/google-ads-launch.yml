@@ -1,0 +1,45 @@
+name: Google Ads — Goalz App campaign
+
+# Fully automated: creates or enables the managed App campaign using repo secrets.
+# Idempotent: safe to re-run (weekly cron) — existing ENABLED campaigns are left alone.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 15 * * 0"
+
+jobs:
+  launch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      GOOGLE_ADS_CLIENT_ID: ${{ secrets.GOOGLE_ADS_CLIENT_ID }}
+      GOOGLE_ADS_CLIENT_SECRET: ${{ secrets.GOOGLE_ADS_CLIENT_SECRET }}
+      GOOGLE_ADS_CUSTOMER_ID: ${{ secrets.GOOGLE_ADS_CUSTOMER_ID }}
+      GOOGLE_ADS_DEVELOPER_TOKEN: ${{ secrets.GOOGLE_ADS_DEVELOPER_TOKEN }}
+      GOOGLE_ADS_REFRESH_TOKEN: ${{ secrets.GOOGLE_ADS_REFRESH_TOKEN }}
+      GOOGLE_ADS_LOGIN_CUSTOMER_ID: ${{ secrets.GOOGLE_ADS_LOGIN_CUSTOMER_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements-growth.txt
+
+      - name: Launch or ensure App campaign
+        run: |
+          python3 -m growth_agent.cli google-ads-launch \
+            --manifest growth_agent/marketing/app_manifest.json \
+            --ad-copy growth_agent/marketing/ad_copy.json
+
+      - name: Summary
+        run: |
+          echo "Google Ads launch job finished. Check Google Ads UI for campaign **Goalz Autonomous Launch** (or your GOOGLE_ADS_GOALZ_CAMPAIGN_NAME)." >> "$GITHUB_STEP_SUMMARY"

@@ -15,6 +15,11 @@ from growth_agent.oauth import (
 )
 from growth_agent.planner import build_daily_plan
 from growth_agent.campaign_links import append_utm_params, campaign_asset_bundle
+from growth_agent.google_ads_launch import (
+    LaunchParams,
+    _escape_gaql_string,
+    launch_goalz_app_campaign,
+)
 from growth_agent.google_ads import (
     channel_metrics_from_google_totals,
     merge_google_channel_metrics,
@@ -156,6 +161,38 @@ class GrowthPlannerTests(unittest.TestCase):
         self.assertEqual(len(increase_actions), 1)
         self.assertEqual(increase_actions[0].payload["new_daily_cap_usd"], 10)
         self.assertNotIn("publish_content:x_posts", [action.code for action in plan.actions])
+
+
+class GoogleAdsLaunchTests(unittest.TestCase):
+    def test_escape_gaql_string_escapes_quotes(self) -> None:
+        self.assertEqual(_escape_gaql_string("a'b"), "a\\'b")
+
+    def test_launch_dry_run_does_not_touch_api(self) -> None:
+        manifest = {
+            "bundle_id": "com.example.app",
+            "app_store": {"url_us": "https://example.com"},
+        }
+        ad_copy = {
+            "google_headlines": ["h1", "h2"],
+            "google_descriptions": ["d1", "d2"],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            mp = Path(tmp) / "m.json"
+            ap = Path(tmp) / "a.json"
+            mp.write_text(json.dumps(manifest), encoding="utf-8")
+            ap.write_text(json.dumps(ad_copy), encoding="utf-8")
+            out = launch_goalz_app_campaign(
+                manifest_path=mp,
+                ad_copy_path=ap,
+                params=LaunchParams(
+                    campaign_name="Test",
+                    daily_budget_usd=7.0,
+                    target_cpa_usd=5.0,
+                    dry_run=True,
+                ),
+            )
+        self.assertTrue(out.get("dry_run"))
+        self.assertEqual(out.get("campaign_name"), "Test")
 
 
 class CampaignLinksTests(unittest.TestCase):
