@@ -19,6 +19,10 @@ That prints the exact `gh secret set ...` commands required for the current ads-
 - `GOOGLE_ADS_DEVELOPER_TOKEN`
 - `GOOGLE_ADS_REFRESH_TOKEN`
 
+Optional (required for many manager-account setups):
+
+- `GOOGLE_ADS_LOGIN_CUSTOMER_ID` (your MCC / manager customer id, digits only)
+
 Recommended additional repo variables later:
 
 - search campaign IDs

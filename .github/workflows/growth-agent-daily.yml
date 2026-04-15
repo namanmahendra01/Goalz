@@ -17,6 +17,7 @@ jobs:
       GOOGLE_ADS_CUSTOMER_ID: ${{ secrets.GOOGLE_ADS_CUSTOMER_ID }}
       GOOGLE_ADS_DEVELOPER_TOKEN: ${{ secrets.GOOGLE_ADS_DEVELOPER_TOKEN }}
       GOOGLE_ADS_REFRESH_TOKEN: ${{ secrets.GOOGLE_ADS_REFRESH_TOKEN }}
+      GOOGLE_ADS_LOGIN_CUSTOMER_ID: ${{ secrets.GOOGLE_ADS_LOGIN_CUSTOMER_ID }}
       APPLE_SEARCH_ADS_ORG_ID: ${{ secrets.APPLE_SEARCH_ADS_ORG_ID }}
       APPLE_SEARCH_ADS_CERTIFICATE_PEM: ${{ secrets.APPLE_SEARCH_ADS_CERTIFICATE_PEM }}
       APPLE_SEARCH_ADS_KEY_ID: ${{ secrets.APPLE_SEARCH_ADS_KEY_ID }}
@@ -34,11 +35,17 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Install growth agent dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements-growth.txt
+
       - name: Run daily planner
         run: |
           python3 -m growth_agent.cli daily-run \
             --config growth_agent/config/default.json \
             --metrics growth_agent/config/sample_metrics.json \
+            --google-live \
             --report-out docs/growth-agent/daily-report.md \
             --json-out docs/growth-agent/daily-report.json \
             --summary-out "$GITHUB_STEP_SUMMARY"

@@ -14,7 +14,17 @@ from growth_agent.oauth import (
     build_meta_debug_token_url,
 )
 from growth_agent.planner import build_daily_plan
-from growth_agent.runtime import missing_secrets_for_enabled_channels, run_daily_workflow
+from growth_agent.google_ads import (
+    channel_metrics_from_google_totals,
+    merge_google_channel_metrics,
+    normalize_google_ads_customer_id,
+)
+from growth_agent.runtime import (
+    missing_secrets_for_enabled_channels,
+    run_daily_workflow,
+    run_daily_workflow_with_metrics,
+    load_metrics_snapshot,
+)
 
 
 class GrowthAgentConfigTests(unittest.TestCase):
@@ -145,6 +155,84 @@ class GrowthPlannerTests(unittest.TestCase):
         self.assertEqual(len(increase_actions), 1)
         self.assertEqual(increase_actions[0].payload["new_daily_cap_usd"], 10)
         self.assertNotIn("publish_content:x_posts", [action.code for action in plan.actions])
+
+
+class GoogleAdsMetricsTests(unittest.TestCase):
+    def test_normalize_google_ads_customer_id_strips_formatting(self) -> None:
+        self.assertEqual(normalize_google_ads_customer_id("123-456-7890"), "1234567890")
+
+    def test_channel_metrics_from_google_totals_computes_roas(self) -> None:
+        metrics = channel_metrics_from_google_totals(
+            cost_micros=5_000_000,
+            conversions_value=20.0,
+            conversions=2.2,
+        )
+        self.assertAlmostEqual(metrics.spend_usd, 5.0)
+        self.assertAlmostEqual(metrics.revenue_usd, 20.0)
+        self.assertAlmostEqual(metrics.roas, 4.0)
+        self.assertEqual(metrics.conversions, 2)
+
+    def test_merge_google_channel_metrics_recomputes_blended_totals(self) -> None:
+        snapshot = MetricsSnapshot(
+            blended_roas=1.0,
+            attributed_revenue_usd=1.0,
+            total_marketing_spend_usd=1.0,
+            channels={
+                "google_ads": ChannelMetrics(spend_usd=5, revenue_usd=10, roas=2.0, conversions=1),
+                "meta_ads": ChannelMetrics(spend_usd=5, revenue_usd=15, roas=3.0, conversions=2),
+            },
+        )
+        google = ChannelMetrics(spend_usd=10, revenue_usd=40, roas=4.0, conversions=4)
+        merged = merge_google_channel_metrics(snapshot, google)
+
+        self.assertAlmostEqual(merged.channels["google_ads"].spend_usd, 10.0)
+        self.assertAlmostEqual(merged.channels["meta_ads"].spend_usd, 5.0)
+        self.assertAlmostEqual(merged.total_marketing_spend_usd, 15.0)
+        self.assertAlmostEqual(merged.attributed_revenue_usd, 55.0)
+        self.assertAlmostEqual(merged.blended_roas, 55.0 / 15.0)
+
+
+class GrowthWorkflowSnapshotTests(unittest.TestCase):
+    def test_run_daily_workflow_with_metrics_matches_file_loader(self) -> None:
+        config_payload = {
+            "budget": {"daily_max_usd": 25, "channel_caps_usd": {"google_ads": 7, "apple_search_ads": 10, "meta_ads": 8}},
+            "guardrails": {"min_blended_roas": 5.0, "min_spend_before_pause_usd": 15},
+            "channels": {
+                "google_ads": {"enabled": True, "mode": "live"},
+                "apple_search_ads": {"enabled": True, "mode": "live"},
+                "meta_ads": {"enabled": True, "mode": "live"},
+            },
+        }
+        metrics_payload = {
+            "blended_roas": 5.8,
+            "attributed_revenue_usd": 58,
+            "total_marketing_spend_usd": 10,
+            "channels": {
+                "google_ads": {"spend_usd": 5, "revenue_usd": 35, "roas": 7.0, "conversions": 4},
+                "apple_search_ads": {"spend_usd": 8, "revenue_usd": 56, "roas": 7.0, "conversions": 7},
+                "meta_ads": {"spend_usd": 6, "revenue_usd": 18, "roas": 3.0, "conversions": 2},
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config_path = Path(tmp_dir) / "config.json"
+            metrics_path = Path(tmp_dir) / "metrics.json"
+            config_path.write_text(json.dumps(config_payload), encoding="utf-8")
+            metrics_path.write_text(json.dumps(metrics_payload), encoding="utf-8")
+
+            metrics = load_metrics_snapshot(metrics_path)
+            from_file = run_daily_workflow(
+                config_path=config_path,
+                metrics_path=metrics_path,
+                provided_secret_names=set(),
+            )
+            from_snapshot = run_daily_workflow_with_metrics(
+                config_path=config_path,
+                metrics=metrics,
+                provided_secret_names=set(),
+            )
+
+        self.assertEqual(from_file.report_markdown, from_snapshot.report_markdown)
 
 
 class GrowthWorkflowTests(unittest.TestCase):

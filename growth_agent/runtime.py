@@ -81,13 +81,12 @@ def load_metrics_snapshot(path: Path) -> MetricsSnapshot:
     )
 
 
-def run_daily_workflow(
+def run_daily_workflow_with_metrics(
     config_path: Path,
-    metrics_path: Path,
+    metrics: MetricsSnapshot,
     provided_secret_names: set[str],
 ) -> WorkflowResult:
     config = load_config(config_path)
-    metrics = load_metrics_snapshot(metrics_path)
     plan = build_daily_plan(config, metrics)
     missing_secrets = missing_secrets_for_enabled_channels(config, provided_secret_names)
     result = WorkflowResult(
@@ -101,3 +100,12 @@ def run_daily_workflow(
         missing_secrets=missing_secrets,
         report_markdown=report_markdown,
     )
+
+
+def run_daily_workflow(
+    config_path: Path,
+    metrics_path: Path,
+    provided_secret_names: set[str],
+) -> WorkflowResult:
+    metrics = load_metrics_snapshot(metrics_path)
+    return run_daily_workflow_with_metrics(config_path, metrics, provided_secret_names)

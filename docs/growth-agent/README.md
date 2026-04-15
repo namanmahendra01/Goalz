@@ -35,6 +35,7 @@ The current live V1 is intentionally conservative:
 - it calculates the daily mode (`growth` or `defensive`)
 - it plans actions such as pausing paid channels or increasing budget inside caps
 - it reports missing secrets by channel
+- it can optionally pull **live Google Ads** spend/conversion value for the `google_ads` slice of the metrics snapshot (see `--google-live`)
 - it is ready for GitHub Actions scheduling
 
 This gets the autonomous control loop and reporting in place first, which is the safest foundation for later platform-specific executors.
@@ -47,15 +48,24 @@ This gets the autonomous control loop and reporting in place first, which is the
 
 ## Daily usage
 
+Install Python deps once (includes the official Google Ads API client):
+
+```bash
+python3 -m pip install -r requirements-growth.txt
+```
+
 Local:
 
 ```bash
 python3 -m growth_agent.cli daily-run \
   --config growth_agent/config/default.json \
   --metrics growth_agent/config/sample_metrics.json \
+  --google-live \
   --report-out docs/growth-agent/daily-report.md \
   --json-out docs/growth-agent/daily-report.json
 ```
+
+Omit `--google-live` if you only want file-based metrics (offline testing).
 
 Secrets validation:
 

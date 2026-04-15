@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import secrets
+import sys
 from pathlib import Path
 
 from growth_agent.oauth import (
@@ -11,7 +12,12 @@ from growth_agent.oauth import (
     build_google_ads_token_payload,
     build_meta_debug_token_url,
 )
-from growth_agent.runtime import REQUIRED_SECRETS, run_daily_workflow
+from growth_agent.runtime import (
+    REQUIRED_SECRETS,
+    load_metrics_snapshot,
+    run_daily_workflow,
+    run_daily_workflow_with_metrics,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -24,6 +30,17 @@ def parse_args() -> argparse.Namespace:
     daily_run.add_argument("--report-out", required=True, type=Path)
     daily_run.add_argument("--json-out", type=Path)
     daily_run.add_argument("--summary-out", type=Path)
+    daily_run.add_argument(
+        "--google-live",
+        action="store_true",
+        help="Replace google_ads metrics using the Google Ads API (requires env secrets + pip deps)",
+    )
+    daily_run.add_argument(
+        "--google-days",
+        type=int,
+        default=7,
+        help="Lookback window for Google Ads metrics when using --google-live (default: 7)",
+    )
 
     validate = subparsers.add_parser("validate-secrets", help="Validate available secrets for enabled live channels")
     validate.add_argument("--config", required=True, type=Path)
@@ -60,9 +77,24 @@ def provided_secret_names_from_env() -> set[str]:
 
 
 def run_daily(args: argparse.Namespace) -> int:
-    result = run_daily_workflow(
+    metrics = load_metrics_snapshot(args.metrics)
+    if args.google_live:
+        from growth_agent.google_ads import (
+            GoogleAdsMetricsError,
+            fetch_google_ads_channel_metrics,
+            merge_google_channel_metrics,
+        )
+
+        try:
+            google = fetch_google_ads_channel_metrics(days=args.google_days)
+        except GoogleAdsMetricsError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        metrics = merge_google_channel_metrics(metrics, google)
+
+    result = run_daily_workflow_with_metrics(
         config_path=args.config,
-        metrics_path=args.metrics,
+        metrics=metrics,
         provided_secret_names=provided_secret_names_from_env(),
     )
 
