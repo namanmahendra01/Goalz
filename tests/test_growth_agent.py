@@ -14,6 +14,7 @@ from growth_agent.oauth import (
     build_meta_debug_token_url,
 )
 from growth_agent.planner import build_daily_plan
+from growth_agent.campaign_links import append_utm_params, campaign_asset_bundle
 from growth_agent.google_ads import (
     channel_metrics_from_google_totals,
     merge_google_channel_metrics,
@@ -155,6 +156,25 @@ class GrowthPlannerTests(unittest.TestCase):
         self.assertEqual(len(increase_actions), 1)
         self.assertEqual(increase_actions[0].payload["new_daily_cap_usd"], 10)
         self.assertNotIn("publish_content:x_posts", [action.code for action in plan.actions])
+
+
+class CampaignLinksTests(unittest.TestCase):
+    def test_append_utm_params_preserves_existing_query(self) -> None:
+        base = "https://apps.apple.com/us/app/example/id123?mt=8"
+        url = append_utm_params(base, source="google", content="c1")
+        self.assertIn("mt=8", url)
+        self.assertIn("utm_source=google", url)
+        self.assertIn("utm_content=c1", url)
+
+    def test_campaign_asset_bundle_reads_manifest(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        manifest = root / "growth_agent" / "marketing" / "app_manifest.json"
+        bundle = campaign_asset_bundle(manifest, content="test", campaign="goalz_launch_v1")
+        self.assertIn("tracking_urls", bundle)
+        urls = bundle["tracking_urls"]
+        assert isinstance(urls, dict)
+        self.assertIn("google", urls)
+        self.assertTrue(str(urls["google"]).startswith("https://apps.apple.com/"))
 
 
 class GoogleAdsMetricsTests(unittest.TestCase):

@@ -7,6 +7,7 @@ import secrets
 import sys
 from pathlib import Path
 
+from growth_agent.campaign_links import campaign_asset_bundle
 from growth_agent.oauth import (
     build_google_ads_authorization_url,
     build_google_ads_token_payload,
@@ -63,6 +64,23 @@ def parse_args() -> argparse.Namespace:
 
     secret_guide = subparsers.add_parser("secret-guide", help="Print gh CLI commands for the active secret contract")
     secret_guide.add_argument("--config", required=True, type=Path)
+
+    campaign_assets = subparsers.add_parser(
+        "campaign-assets",
+        help="Print App Store tracking URLs and bundled ad copy for Google, Meta, and Apple Search Ads",
+    )
+    campaign_assets.add_argument(
+        "--manifest",
+        type=Path,
+        default=Path("growth_agent/marketing/app_manifest.json"),
+    )
+    campaign_assets.add_argument("--content", default="default", help="utm_content slug (per creative or ad group)")
+    campaign_assets.add_argument("--campaign", default="goalz_launch_v1", help="utm_campaign value")
+    campaign_assets.add_argument(
+        "--ad-copy",
+        type=Path,
+        default=Path("growth_agent/marketing/ad_copy.json"),
+    )
 
     return parser.parse_args()
 
@@ -170,6 +188,19 @@ def print_meta_debug_url(args: argparse.Namespace) -> int:
     return 0
 
 
+def print_campaign_assets(args: argparse.Namespace) -> int:
+    bundle = campaign_asset_bundle(
+        args.manifest,
+        content=args.content,
+        campaign=args.campaign,
+    )
+    payload: dict[str, object] = dict(bundle)
+    if args.ad_copy.is_file():
+        payload["ad_copy"] = json.loads(args.ad_copy.read_text(encoding="utf-8"))
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
 def print_secret_guide(args: argparse.Namespace) -> int:
     result = run_daily_workflow(
         config_path=args.config,
@@ -198,6 +229,8 @@ def main() -> int:
         return print_meta_debug_url(args)
     if args.command == "secret-guide":
         return print_secret_guide(args)
+    if args.command == "campaign-assets":
+        return print_campaign_assets(args)
     raise ValueError(f"Unsupported command: {args.command}")
 
 

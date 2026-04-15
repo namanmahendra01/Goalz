@@ -1,0 +1,10 @@
+{
+  "app_name": "Goalz: Goal Countdown Widget",
+  "bundle_id": "com.ziro.goalzdots.iphone",
+  "app_store": {
+    "id": "6762053420",
+    "url_us": "https://apps.apple.com/us/app/goalz-goal-countdown-widget/id6762053420"
+  },
+  "pricing_usd": 4.99,
+  "positioning": "One active goal, daily countdown, Home Screen and Lock Screen widgets. No ads. No account."
+}

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Goalz — Campaign playbook</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f4f6;
+      --card: rgba(255, 255, 255, 0.8);
+      --text: #161a22;
+      --muted: #5c6473;
+      --accent: #ff6b5e;
+      --border: rgba(22, 26, 34, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(255, 107, 94, 0.16), transparent 32%),
+        radial-gradient(circle at bottom right, rgba(114, 199, 255, 0.18), transparent 34%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 48px 20px;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; }
+    .card {
+      background: var(--card);
+      backdrop-filter: blur(18px);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      padding: 28px;
+      box-shadow: 0 18px 50px rgba(22, 26, 34, 0.08);
+    }
+    h1 {
+      font-size: clamp(28px, 5vw, 40px);
+      line-height: 1.1;
+      margin: 0 0 12px;
+      letter-spacing: -0.03em;
+    }
+    h2 {
+      font-size: 20px;
+      margin: 28px 0 10px;
+      letter-spacing: -0.02em;
+    }
+    p, li {
+      font-size: 17px;
+      line-height: 1.55;
+      color: var(--muted);
+      margin: 0 0 12px;
+    }
+    ul { padding-left: 1.2rem; }
+    a { color: var(--text); font-weight: 600; }
+    .links { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+    a.button {
+      display: inline-block;
+      text-decoration: none;
+      color: white;
+      background: var(--accent);
+      border-radius: 999px;
+      padding: 14px 20px;
+      font-weight: 600;
+    }
+    a.text-link {
+      text-decoration: none;
+      font-weight: 600;
+      padding: 14px 6px;
+    }
+    pre {
+      background: rgba(22, 26, 34, 0.06);
+      border-radius: 16px;
+      padding: 14px 16px;
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <h1>Campaign playbook (v1)</h1>
+      <p><strong>Live App Store (US):</strong>
+        <a href="https://apps.apple.com/us/app/goalz-goal-countdown-widget/id6762053420">Goalz: Goal Countdown Widget</a>
+      </p>
+      <p><strong>Budget starter:</strong> about $25/day total — Google ~$7, Apple Search Ads ~$10, Meta ~$8.</p>
+      <div class="links">
+        <a class="button" href="https://apps.apple.com/us/app/goalz-goal-countdown-widget/id6762053420">Download on the App Store</a>
+        <a class="text-link" href="./">Home</a>
+        <a class="text-link" href="./campaign-playbook.md">Markdown version</a>
+      </div>
+
+      <h2>Tracking link template</h2>
+      <pre>https://apps.apple.com/us/app/goalz-goal-countdown-widget/id6762053420?utm_source={source}&amp;utm_medium=paid&amp;utm_campaign=goalz_launch_v1&amp;utm_content={creative}</pre>
+      <p>Use <code>google</code>, <code>meta</code>, or <code>apple_search</code> for <code>{source}</code>.</p>
+
+      <h2>Apple Search Ads</h2>
+      <ul>
+        <li>Open <a href="https://searchads.apple.com/">searchads.apple.com</a> → App promotion → select Goalz (<code>com.ziro.goalzdots.iphone</code>).</li>
+        <li>Start US only; conservative CPT; ~$10/day.</li>
+        <li>Keywords to test: goal tracker, countdown widget, lock screen widget, single goal app.</li>
+      </ul>
+
+      <h2>Google Ads</h2>
+      <ul>
+        <li>Open <a href="https://ads.google.com/">ads.google.com</a> → App promotion → iOS → paste App Store URL with UTMs.</li>
+        <li>~$7/day; avoid thrashing bids during learning (3–7 days).</li>
+      </ul>
+
+      <h2>Meta Ads</h2>
+      <ul>
+        <li>Open <a href="https://adsmanager.facebook.com/">Ads Manager</a> → App / Sales objective per your signal setup.</li>
+        <li>~$8/day; use 9:16 and 1:1 creative showing widgets + countdown.</li>
+      </ul>
+
+      <h2>Measurement</h2>
+      <p>Blended ROAS is attributed revenue divided by total ad spend. Pull spend from each platform; revenue from App Store Connect (and refunds).</p>
+    </section>
+  </main>
+</body>
+</html>

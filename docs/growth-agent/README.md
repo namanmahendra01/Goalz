@@ -46,6 +46,12 @@ This gets the autonomous control loop and reporting in place first, which is the
 - `Apple Search Ads`: highest-intent app-store paid automation
 - `Meta Ads`: paid social expansion after creatives and account targets are configured
 
+## Live App Store
+
+- [Goalz: Goal Countdown Widget (US)](https://apps.apple.com/us/app/goalz-goal-countdown-widget/id6762053420)
+
+Campaign launch steps, budgets, and platform links: [campaign-playbook.md](./campaign-playbook.md) (and [campaign.html](./campaign.html) for a short HTML summary).
+
 ## Daily usage
 
 Install Python deps once (includes the official Google Ads API client):
@@ -66,6 +72,14 @@ python3 -m growth_agent.cli daily-run \
 ```
 
 Omit `--google-live` if you only want file-based metrics (offline testing).
+
+Paste-ready tracking URLs + headline/copy bank:
+
+```bash
+python3 -m growth_agent.cli campaign-assets
+```
+
+Optional: `--content lock_screen` to change `utm_content` for a specific creative.
 
 Secrets validation:
 
