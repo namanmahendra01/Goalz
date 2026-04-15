@@ -1,12 +1,13 @@
-name: Google Ads — Goalz App campaign
+name: Google Ads — Goalz daily manager
 
-# Fully automated: creates or enables the managed App campaign using repo secrets.
-# Idempotent: safe to re-run (weekly cron) — existing ENABLED campaigns are left alone.
+# Fully automated: creates the managed App campaign if missing, then checks it daily.
+# If trailing campaign ROAS falls below the configured floor after meaningful spend,
+# the campaign is paused instead of continuing to burn spend.
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 15 * * 0"
+    - cron: "0 15 * * *"
 
 jobs:
   launch:
@@ -20,6 +21,9 @@ jobs:
       GOOGLE_ADS_DEVELOPER_TOKEN: ${{ secrets.GOOGLE_ADS_DEVELOPER_TOKEN }}
       GOOGLE_ADS_REFRESH_TOKEN: ${{ secrets.GOOGLE_ADS_REFRESH_TOKEN }}
       GOOGLE_ADS_LOGIN_CUSTOMER_ID: ${{ secrets.GOOGLE_ADS_LOGIN_CUSTOMER_ID }}
+      GOOGLE_ADS_MIN_ROAS: "5"
+      GOOGLE_ADS_MIN_SPEND_BEFORE_PAUSE_USD: "15"
+      GOOGLE_ADS_ROAS_LOOKBACK_DAYS: "7"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,7 +38,7 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install -r requirements-growth.txt
 
-      - name: Launch or ensure App campaign
+      - name: Launch or manage App campaign
         run: |
           python3 -m growth_agent.cli google-ads-launch \
             --manifest growth_agent/marketing/app_manifest.json \
@@ -42,4 +46,4 @@ jobs:
 
       - name: Summary
         run: |
-          echo "Google Ads launch job finished. Check Google Ads UI for campaign **Goalz Autonomous Launch** (or your GOOGLE_ADS_GOALZ_CAMPAIGN_NAME)." >> "$GITHUB_STEP_SUMMARY"
+          echo "Google Ads daily manager finished. Campaign **Goalz Autonomous Launch** is created if missing, and paused if 7-day ROAS drops below 5 after at least $15 spend." >> "$GITHUB_STEP_SUMMARY"

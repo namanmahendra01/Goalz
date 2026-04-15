@@ -8,6 +8,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from growth_agent.google_ads import GoogleAdsMetricsError, build_google_ads_client, load_google_ads_env
+from growth_agent.models import ChannelMetrics
 
 
 class GoogleAdsLaunchError(RuntimeError):
@@ -29,6 +30,62 @@ def _load_ad_copy(path: Path) -> tuple[list[str], list[str]]:
     if len(headlines) < 2 or len(descriptions) < 2:
         raise GoogleAdsLaunchError("ad_copy.json needs at least 2 google_headlines and 2 google_descriptions.")
     return headlines[:15], descriptions[:5]
+
+
+def _campaign_datetime(days_from_now: int, clock: datetime | None = None, *, end_of_day: bool) -> str:
+    base = (clock or datetime.now()) + timedelta(days=days_from_now)
+    suffix = "23:59:59" if end_of_day else "00:00:00"
+    return f"{base.strftime('%Y%m%d')} {suffix}"
+
+
+def build_launch_spec(manifest: dict[str, object], params: "LaunchParams") -> dict[str, object]:
+    app_store = manifest.get("app_store")
+    if not isinstance(app_store, dict):
+        raise GoogleAdsLaunchError("app_manifest.json must contain an app_store object.")
+
+    app_id = str(app_store.get("id") or "").strip()
+    if not app_id:
+        raise GoogleAdsLaunchError("app_manifest.json must set app_store.id for Apple App campaigns.")
+
+    bundle_id = str(manifest.get("bundle_id") or "").strip()
+    if not bundle_id:
+        raise GoogleAdsLaunchError("app_manifest.json must set bundle_id.")
+
+    return {
+        "campaign_name": params.campaign_name,
+        "app_id": app_id,
+        "bundle_id": bundle_id,
+        "daily_budget_micros": _usd_to_micros(params.daily_budget_usd),
+        "target_cpa_micros": _usd_to_micros(params.target_cpa_usd),
+        "start_date_time": _campaign_datetime(1, end_of_day=False),
+        "end_date_time": _campaign_datetime(365, end_of_day=True),
+        "lookback_days": params.lookback_days,
+        "min_roas": params.min_roas,
+        "min_spend_before_pause_usd": params.min_spend_before_pause_usd,
+    }
+
+
+def decide_google_ads_daily_action(
+    *,
+    campaign_exists: bool,
+    campaign_status: str | None,
+    metrics: ChannelMetrics | None,
+    min_roas: float,
+    min_spend_before_pause_usd: float,
+) -> str:
+    if not campaign_exists:
+        return "create"
+    if campaign_status == "PAUSED":
+        return "leave_paused"
+    if campaign_status != "ENABLED":
+        return "none"
+    if metrics is None:
+        return "none"
+    if metrics.spend_usd < min_spend_before_pause_usd:
+        return "keep_learning"
+    if metrics.roas < min_roas:
+        return "pause"
+    return "none"
 
 
 def _find_managed_campaign(
@@ -54,12 +111,23 @@ def _find_managed_campaign(
 
 
 def _enable_campaign(client, customer_id: str, resource_name: str) -> None:
-    from google.protobuf import field_mask_pb2
+    from google.protobuf import field_mask_pb2  # type: ignore[import-not-found]  # pyright: ignore[reportMissingImports,reportMissingModuleSource]
 
     campaign_service = client.get_service("CampaignService")
     op = client.get_type("CampaignOperation")
     op.update.resource_name = resource_name
     op.update.status = client.enums.CampaignStatusEnum.ENABLED
+    op.update_mask.CopyFrom(field_mask_pb2.FieldMask(paths=["status"]))
+    campaign_service.mutate_campaigns(customer_id=customer_id, operations=[op])
+
+
+def _pause_campaign(client, customer_id: str, resource_name: str) -> None:
+    from google.protobuf import field_mask_pb2  # type: ignore[import-not-found]  # pyright: ignore[reportMissingImports,reportMissingModuleSource]
+
+    campaign_service = client.get_service("CampaignService")
+    op = client.get_type("CampaignOperation")
+    op.update.resource_name = resource_name
+    op.update.status = client.enums.CampaignStatusEnum.PAUSED
     op.update_mask.CopyFrom(field_mask_pb2.FieldMask(paths=["status"]))
     campaign_service.mutate_campaigns(customer_id=customer_id, operations=[op])
 
@@ -82,8 +150,10 @@ def _create_app_campaign(
     *,
     budget_resource_name: str,
     campaign_name: str,
-    bundle_id: str,
+    app_id: str,
     target_cpa_micros: int,
+    start_date_time: str,
+    end_date_time: str,
 ) -> str:
     campaign_service = client.get_service("CampaignService")
     op = client.get_type("CampaignOperation")
@@ -94,7 +164,7 @@ def _create_app_campaign(
     c.advertising_channel_type = client.enums.AdvertisingChannelTypeEnum.MULTI_CHANNEL
     c.advertising_channel_sub_type = client.enums.AdvertisingChannelSubTypeEnum.APP_CAMPAIGN
     c.target_cpa.target_cpa_micros = target_cpa_micros
-    c.app_campaign_setting.app_id = bundle_id
+    c.app_campaign_setting.app_id = app_id
     c.app_campaign_setting.app_store = client.enums.AppCampaignAppStoreEnum.APPLE_APP_STORE
     c.app_campaign_setting.bidding_strategy_goal_type = (
         client.enums.AppCampaignBiddingStrategyGoalTypeEnum.OPTIMIZE_INSTALLS_TARGET_INSTALL_COST
@@ -102,8 +172,8 @@ def _create_app_campaign(
     c.contains_eu_political_advertising = (
         client.enums.EuPoliticalAdvertisingStatusEnum.DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING
     )
-    c.start_date_time = (datetime.now() + timedelta(days=1)).strftime("%Y%m%d 000000")
-    c.end_date_time = (datetime.now() + timedelta(days=365)).strftime("%Y%m%d 235959")
+    c.start_date_time = start_date_time
+    c.end_date_time = end_date_time
 
     resp = campaign_service.mutate_campaigns(customer_id=customer_id, operations=[op])
     return resp.results[0].resource_name
@@ -165,12 +235,48 @@ def _create_app_ad(
     ad_svc.mutate_ad_group_ads(customer_id=customer_id, operations=[op])
 
 
+def _fetch_campaign_metrics(client, customer_id: str, campaign_resource_name: str, *, days: int) -> ChannelMetrics:
+    end = datetime.now().date() - timedelta(days=1)
+    start = end - timedelta(days=days - 1)
+    ga = client.get_service("GoogleAdsService")
+    safe = _escape_gaql_string(campaign_resource_name)
+    query = f"""
+        SELECT
+          metrics.cost_micros,
+          metrics.conversions,
+          metrics.conversions_value
+        FROM campaign
+        WHERE campaign.resource_name = '{safe}'
+          AND segments.date BETWEEN '{start.isoformat()}' AND '{end.isoformat()}'
+    """
+    total_cost_micros = 0
+    total_conversions = 0.0
+    total_conversions_value = 0.0
+    stream = ga.search_stream(customer_id=customer_id, query=query)
+    for batch in stream:
+        for row in batch.results:
+            total_cost_micros += int(row.metrics.cost_micros)
+            total_conversions += float(row.metrics.conversions)
+            total_conversions_value += float(row.metrics.conversions_value)
+    spend_usd = total_cost_micros / 1_000_000
+    roas = (total_conversions_value / spend_usd) if spend_usd > 0 else 0.0
+    return ChannelMetrics(
+        spend_usd=spend_usd,
+        revenue_usd=float(total_conversions_value),
+        roas=roas,
+        conversions=int(round(total_conversions)),
+    )
+
+
 @dataclass(frozen=True)
 class LaunchParams:
     campaign_name: str
     daily_budget_usd: float
     target_cpa_usd: float
     dry_run: bool
+    min_roas: float = 5.0
+    min_spend_before_pause_usd: float = 15.0
+    lookback_days: int = 7
 
 
 def launch_goalz_app_campaign(
@@ -179,79 +285,88 @@ def launch_goalz_app_campaign(
     ad_copy_path: Path,
     params: LaunchParams,
 ) -> dict[str, object]:
-    """Create (or resume) a Goalz iOS App campaign via the Google Ads API.
+    """Create or manage a Goalz iOS App campaign via the Google Ads API.
 
-    Idempotent: if ``params.campaign_name`` already exists, PAUSED campaigns are
-    enabled; ENABLED campaigns are left as-is.
+    Idempotent: creates the campaign when missing. Existing ENABLED campaigns are
+    monitored and paused when ROAS falls below the configured floor after enough
+    spend; PAUSED campaigns are left paused.
     """
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    app_store = manifest.get("app_store")
-    if not isinstance(app_store, dict):
-        raise GoogleAdsLaunchError("app_manifest.json must contain an app_store object.")
-    bundle_id = str(manifest.get("bundle_id") or "").strip()
-    if not bundle_id:
-        raise GoogleAdsLaunchError("app_manifest.json must set bundle_id.")
+    spec = build_launch_spec(manifest, params)
+    headlines, descriptions = _load_ad_copy(ad_copy_path)
 
     if params.dry_run:
-        return {
-            "dry_run": True,
-            "campaign_name": params.campaign_name,
-            "daily_budget_micros": _usd_to_micros(params.daily_budget_usd),
-            "target_cpa_micros": _usd_to_micros(params.target_cpa_usd),
-            "bundle_id": bundle_id,
-        }
+        return {"dry_run": True, **spec, "headline_count": len(headlines), "description_count": len(descriptions)}
 
     env = load_google_ads_env()
     client = build_google_ads_client(env)
     customer_id = env.customer_id
 
-    headlines, descriptions = _load_ad_copy(ad_copy_path)
-    daily_micros = _usd_to_micros(params.daily_budget_usd)
-    target_cpa_micros = _usd_to_micros(params.target_cpa_usd)
-
     existing = _find_managed_campaign(client, customer_id, params.campaign_name)
     enabled = client.enums.CampaignStatusEnum.ENABLED
-    paused = client.enums.CampaignStatusEnum.PAUSED
     if existing is not None:
         resource_name, status = existing
-        if status == enabled:
+        status_name = getattr(status, "name", str(status))
+        metrics = _fetch_campaign_metrics(client, customer_id, resource_name, days=params.lookback_days)
+        action = decide_google_ads_daily_action(
+            campaign_exists=True,
+            campaign_status=status_name,
+            metrics=metrics,
+            min_roas=params.min_roas,
+            min_spend_before_pause_usd=params.min_spend_before_pause_usd,
+        )
+        if action == "pause" and status == enabled:
+            _pause_campaign(client, customer_id, resource_name)
             return {
                 "already_exists": True,
                 "campaign_resource_name": resource_name,
-                "status": "ENABLED",
-                "action": "none",
+                "status": "PAUSED",
+                "action": "paused_for_low_roas",
+                "metrics": {
+                    "spend_usd": metrics.spend_usd,
+                    "revenue_usd": metrics.revenue_usd,
+                    "roas": metrics.roas,
+                    "conversions": metrics.conversions,
+                },
             }
-        if status == paused:
-            _enable_campaign(client, customer_id, resource_name)
+        if action in {"none", "keep_learning", "leave_paused"}:
             return {
                 "already_exists": True,
                 "campaign_resource_name": resource_name,
-                "status": "ENABLED",
-                "action": "enabled_existing_paused_campaign",
+                "status": status_name,
+                "action": action,
+                "metrics": {
+                    "spend_usd": metrics.spend_usd,
+                    "revenue_usd": metrics.revenue_usd,
+                    "roas": metrics.roas,
+                    "conversions": metrics.conversions,
+                },
             }
         return {
             "already_exists": True,
             "campaign_resource_name": resource_name,
-            "status": repr(status),
+            "status": status_name,
             "action": "unexpected_status_no_changes",
         }
 
     try:
-        from google.ads.googleads.errors import GoogleAdsException
+        from google.ads.googleads.errors import GoogleAdsException  # pyright: ignore[reportMissingImports]
     except ImportError as exc:
         raise GoogleAdsLaunchError(
             "google-ads is not installed. pip install -r requirements-growth.txt"
         ) from exc
 
     try:
-        budget_rn = _create_budget(client, customer_id, daily_budget_micros=daily_micros)
+        budget_rn = _create_budget(client, customer_id, daily_budget_micros=int(spec["daily_budget_micros"]))
         campaign_rn = _create_app_campaign(
             client,
             customer_id,
             budget_resource_name=budget_rn,
             campaign_name=params.campaign_name,
-            bundle_id=bundle_id,
-            target_cpa_micros=target_cpa_micros,
+            app_id=str(spec["app_id"]),
+            target_cpa_micros=int(spec["target_cpa_micros"]),
+            start_date_time=str(spec["start_date_time"]),
+            end_date_time=str(spec["end_date_time"]),
         )
         _add_us_english_targeting(client, customer_id, campaign_rn)
         ad_group_rn = _create_ad_group(client, customer_id, campaign_rn)
@@ -279,4 +394,15 @@ def default_launch_params() -> LaunchParams:
     daily = float(os.getenv("GOOGLE_ADS_GOALZ_DAILY_BUDGET_USD", "7"))
     tcpa = float(os.getenv("GOOGLE_ADS_GOALZ_TARGET_CPA_USD", "5"))
     dry = os.getenv("GOOGLE_ADS_LAUNCH_DRY_RUN", "").lower() in ("1", "true", "yes")
-    return LaunchParams(campaign_name=name, daily_budget_usd=daily, target_cpa_usd=tcpa, dry_run=dry)
+    min_roas = float(os.getenv("GOOGLE_ADS_MIN_ROAS", "5"))
+    min_spend = float(os.getenv("GOOGLE_ADS_MIN_SPEND_BEFORE_PAUSE_USD", "15"))
+    lookback_days = int(os.getenv("GOOGLE_ADS_ROAS_LOOKBACK_DAYS", "7"))
+    return LaunchParams(
+        campaign_name=name,
+        daily_budget_usd=daily,
+        target_cpa_usd=tcpa,
+        dry_run=dry,
+        min_roas=min_roas,
+        min_spend_before_pause_usd=min_spend,
+        lookback_days=lookback_days,
+    )

@@ -18,6 +18,8 @@ from growth_agent.campaign_links import append_utm_params, campaign_asset_bundle
 from growth_agent.google_ads_launch import (
     LaunchParams,
     _escape_gaql_string,
+    build_launch_spec,
+    decide_google_ads_daily_action,
     launch_goalz_app_campaign,
 )
 from growth_agent.google_ads import (
@@ -167,10 +169,62 @@ class GoogleAdsLaunchTests(unittest.TestCase):
     def test_escape_gaql_string_escapes_quotes(self) -> None:
         self.assertEqual(_escape_gaql_string("a'b"), "a\\'b")
 
+    def test_build_launch_spec_uses_app_store_id_and_google_datetime_format(self) -> None:
+        manifest = {
+            "bundle_id": "com.example.app",
+            "app_store": {"id": "6762053420", "url_us": "https://example.com"},
+        }
+        params = LaunchParams(
+            campaign_name="Goalz Autonomous Launch",
+            daily_budget_usd=7.0,
+            target_cpa_usd=5.0,
+            dry_run=True,
+        )
+
+        spec = build_launch_spec(manifest, params)
+
+        self.assertEqual(spec["app_id"], "6762053420")
+        self.assertEqual(spec["bundle_id"], "com.example.app")
+        self.assertRegex(spec["start_date_time"], r"^\d{8} \d{2}:\d{2}:\d{2}$")
+        self.assertRegex(spec["end_date_time"], r"^\d{8} \d{2}:\d{2}:\d{2}$")
+
+    def test_decide_google_ads_daily_action_pauses_when_roas_below_floor(self) -> None:
+        action = decide_google_ads_daily_action(
+            campaign_exists=True,
+            campaign_status="ENABLED",
+            metrics=ChannelMetrics(spend_usd=20, revenue_usd=60, roas=3.0, conversions=2),
+            min_roas=5.0,
+            min_spend_before_pause_usd=15.0,
+        )
+
+        self.assertEqual(action, "pause")
+
+    def test_decide_google_ads_daily_action_creates_campaign_when_missing(self) -> None:
+        action = decide_google_ads_daily_action(
+            campaign_exists=False,
+            campaign_status=None,
+            metrics=None,
+            min_roas=5.0,
+            min_spend_before_pause_usd=15.0,
+        )
+
+        self.assertEqual(action, "create")
+
+    def test_decide_google_ads_daily_action_keeps_paused_campaign_paused(self) -> None:
+        action = decide_google_ads_daily_action(
+            campaign_exists=True,
+            campaign_status="PAUSED",
+            metrics=ChannelMetrics(spend_usd=40, revenue_usd=300, roas=7.5, conversions=8),
+            min_roas=5.0,
+            min_spend_before_pause_usd=15.0,
+        )
+
+        self.assertEqual(action, "leave_paused")
+
     def test_launch_dry_run_does_not_touch_api(self) -> None:
         manifest = {
             "bundle_id": "com.example.app",
-            "app_store": {"url_us": "https://example.com"},
+            "app_store": {"id": "6762053420", "url_us": "https://example.com"},
         }
         ad_copy = {
             "google_headlines": ["h1", "h2"],
